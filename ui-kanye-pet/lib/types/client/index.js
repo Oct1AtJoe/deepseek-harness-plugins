@@ -23,5 +23,26 @@ export function apply(ctx) {
         locale: NS,
         inject: () => controller.inject(),
     }, KanyeCard));
+    // Desktop pet bubble / Windows toast click: the Tauri shell dispatches
+    // `dsh:open-session` on the main window; open the target session here.
+    // The listener lives in this plugin since dsh-notification-custom was retired.
+    ctx.effect(() => {
+        const onOpenSession = (event) => {
+            const sessionId = event.detail?.sessionId;
+            if (typeof sessionId !== 'string' || sessionId === '')
+                return;
+            // Client-side Session Controller (same service ui-chat/ui-workspace use);
+            // resolved lazily at click time — unknown ids fail loud inside open().
+            const sessions = ctx.get('sessions');
+            try {
+                sessions?.open?.(sessionId);
+            }
+            catch (error) {
+                console.warn(`[ui-kanye-pet] open session ${sessionId} failed:`, error);
+            }
+        };
+        window.addEventListener('dsh:open-session', onOpenSession);
+        return () => { window.removeEventListener('dsh:open-session', onOpenSession); };
+    }, 'ui-kanye-pet: dsh:open-session jump');
 }
 //# sourceMappingURL=index.js.map

@@ -411,6 +411,22 @@ window.__ModuleLoader__.load({
 				locale: NS,
 				inject: () => controller.inject()
 			}, KanyeCard));
+			ctx.effect(() => {
+				const onOpenSession = (event) => {
+					const sessionId = event.detail?.sessionId;
+					if (typeof sessionId !== "string" || sessionId === "") return;
+					const sessions = ctx.get("sessions");
+					try {
+						sessions?.open?.(sessionId);
+					} catch (error) {
+						console.warn(`[ui-kanye-pet] open session ${sessionId} failed:`, error);
+					}
+				};
+				window.addEventListener("dsh:open-session", onOpenSession);
+				return () => {
+					window.removeEventListener("dsh:open-session", onOpenSession);
+				};
+			}, "ui-kanye-pet: dsh:open-session jump");
 		}
 		//#endregion
 		exports.NS = NS;

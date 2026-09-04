@@ -1,5 +1,5 @@
 /** The kanye-pet card's form over the `kanye-pet` settings namespace. */
-import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client';
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-store';
 /** Namespace of the kanye-pet capability (matches the host plugin). */
 export const KANYE_NS = 'kanye-pet';
 /** Bridges the `kanye-pet` scope onto the card's staged form. */

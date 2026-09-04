@@ -68,7 +68,7 @@ Tauri pet.js → pollState() → showBubble() → 气泡显示 8s
     ↓
 pet_open_session (Tauri command) → show_main + open_session
     ↓ eval `dsh:open-session` CustomEvent
-    ↓ dsh-notification-custom 客户端监听 → sessions.open(id)
+    ↓ ui-kanye-pet 客户端监听 → ctx.sessions.open(id)
 ```
 
 ---
@@ -414,7 +414,7 @@ new Notification(...)
 | 通知队列 | 单槽 `petNotification`（最新覆盖旧），60s TTL 防残留 |
 | tag 去重 | pet.js `lastNotifTag` 防轮询重复显示 |
 | 气泡时长 | 8s 自动消失 |
-| 点击跳转 | `pet_open_session`(Tauri command) → `show_main` + `open_session` → eval `dsh:open-session` CustomEvent → dsh-notification-custom 监听 `sessions.open(id)`；点击后气泡立即消失 |
+| 点击跳转 | `pet_open_session`(Tauri command) → `show_main` + `open_session` → eval `dsh:open-session` CustomEvent → **ui-kanye-pet client 监听 → `ctx.sessions.open(id)`**（rc.1 client Session Controller；2026-09-04 起由 ui-kanye-pet 承担，原提供方 dsh-notification-custom 已退役）；点击后气泡立即消失 |
 | 会话标题兜底链 | `resolveSessionTitle` → `session.label` → `session.id`（启动初期标题未就绪时兜底） |
 | 延迟 | turn/end 写入 log 后，下一条 session/event 到来时检测（通常毫秒级） |
 
@@ -739,7 +739,7 @@ dbg.textContent = 'debug info'
 | 桌宠气泡不出现 | `curl http://127.0.0.1:3080/kanye-pet/state` 看 notification 字段；DSH 日志查 `[kanye-pet] notify <id>: "<标题>"`（发出时必打）；只有 `/state` DEBUG 行而无 notify 行 = 检测路径失效（§七 #35） |
 | 通知内容不对 | 检查 turn/end 的 `reason.kind` 映射；标题兜底链是否命中 |
 | Windows 通知和气泡同时弹 | ShimNotification 是否误走 `fire()`；`/kanye-pet/notify` 端点是否残留 |
-| 点击气泡不跳转 | DSH 日志查 `会话跳转事件派发失败`；sessionId 是否为空；dsh-notification-custom 是否加载 |
+| 点击气泡不跳转 | 窗口弹出但不切会话 = 主窗口缺 `dsh:open-session` 监听器（原由 dsh-notification-custom 提供，退役后由 ui-kanye-pet client 承担——确认其 client.js 含 `dsh:open-session` 且页面硬刷加载了新 bundle）；DSH 日志查 `会话跳转事件派发失败` |
 | 桌宠透明 | manifest.json 是否 200；`loadManifest` 重试是否生效 |
 | 改动不生效 | ① 清 WebView 缓存 ② 杀 node 重启 exe ③ 删 build 产物重编（6.3） |
 

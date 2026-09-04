@@ -1,5 +1,5 @@
 /** kanye-pet settings, browser half — one Settings tab (like subagents). */
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client';
+import type { Context as ClientContext } from '@deepseek-ai/cordis';
 import { type KanyeLocaleKey } from './locales.ts';
 export type { KanyeCardFace, KanyeCardState, KanyeSettings } from './kanye-card-controller.ts';
 export type { KanyeLocaleKey } from './locales.ts';
