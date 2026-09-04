@@ -27,6 +27,7 @@ window.__ModuleLoader__.load({
 		const REORDER_WORKSPACES_ROUTE = ROUTE_PREFIX + "/reorder-workspaces";
 		const PIN_ROUTE = ROUTE_PREFIX + "/pin";
 		const UNARCHIVE_ROUTE = ROUTE_PREFIX + "/unarchive";
+		const SESSION_PATH_ROUTE = ROUTE_PREFIX + "/session-path";
 		/** Open a registered workspace directory in the host's file manager. */
 		const OPEN_FOLDER_ROUTE = ROUTE_PREFIX + "/open-folder";
 		/** How many archived sessions the Archive block shows before the "Show more" toggle (matches the original browser's collapsed limit). */
@@ -83,6 +84,10 @@ const RECENT_LIMIT = 5;
 			"menu.quoteSession": "引用到当前会话",
 			"menu.archiveSession": "归档会话",
 			"action.copySessionId": "复制会话 ID",
+			"menu.copySessionPath": "复制会话路径",
+			"notice.pathCopied": "会话路径已复制",
+			"error.noSessionPath": "该会话没有可用路径",
+			"error.pathNotFound": "未找到会话的日志文件",
 			"action.copied": "已复制",
 			"menu.moveToFolder": "移动到文件夹…",
 			"menu.moveNewFolder": "新建文件夹…",
@@ -172,6 +177,10 @@ const RECENT_LIMIT = 5;
 			"menu.quoteSession": "Quote into current session",
 			"menu.archiveSession": "Archive session",
 			"action.copySessionId": "Copy session ID",
+			"menu.copySessionPath": "Copy session path",
+			"notice.pathCopied": "Session path copied",
+			"error.noSessionPath": "This session has no available path",
+			"error.pathNotFound": "Session log file not found",
 			"action.copied": "Copied",
 			"menu.moveToFolder": "Move to folder…",
 			"menu.moveNewFolder": "New folder…",
@@ -463,6 +472,10 @@ const RECENT_LIMIT = 5;
 }
 .dsh-ff__notice--error {
   background: rgba(239, 68, 68, .12);
+  color: var(--dsw-alias-label-primary, #111827);
+}
+.dsh-ff__notice--ok {
+  background: rgba(34, 197, 94, .14);
   color: var(--dsw-alias-label-primary, #111827);
 }
 .dsh-ff__list {
@@ -1129,6 +1142,7 @@ const RECENT_LIMIT = 5;
 				: code === "empty-title" ? "emptyTitle"
 				: code === "session-not-live" ? "sessionNotLive"
 				: code === "auto-rename-in-progress" ? "autoRenameInProgress"
+				: code === "path-not-found" ? "pathNotFound"
 				: "actionFailed");
 			return t(key);
 		}
@@ -1418,6 +1432,21 @@ const RECENT_LIMIT = 5;
 			const pinSession = (sessionId, pinned) => {
 				mutateFolders(PIN_ROUTE, { sessionId, pinned });
 			};
+			/** Copy text to the clipboard, with a legacy textarea fallback. */
+			const copyText = async (text) => {
+				try {
+					await navigator.clipboard.writeText(text);
+				} catch {
+					const area = document.createElement("textarea");
+					area.value = text;
+					area.style.position = "fixed";
+					area.style.opacity = "0";
+					document.body.appendChild(area);
+					area.select();
+					document.execCommand("copy");
+					document.body.removeChild(area);
+				}
+			};
 			/** Open the row context menu at the pointer position. */
 			const openContextMenu = (event, menu) => {
 				event.preventDefault();
@@ -1571,6 +1600,7 @@ const RECENT_LIMIT = 5;
 						: { id: "pin", label: t("menu.pin"), disabled: workspace === void 0, icon: pinIcon(false) },
 					{ id: "fork", label: t("menu.fork"), icon: e(primitives.IconBranchOutline16, {}) },
 					...(list.current !== void 0 && summary.id !== list.current ? [{ id: "quote", label: t("menu.quoteSession"), icon: quoteIcon() }] : []),
+					{ id: "copy-path", label: t("menu.copySessionPath"), icon: e(primitives.IconBrowseOutline16, {}) },
 					{
 						id: "move",
 						label: t("menu.moveToFolder"),
@@ -1612,6 +1642,17 @@ const RECENT_LIMIT = 5;
 					if (list.current === void 0 || !quoteSession(list.current, summary.id, summary.displayTitle)) {
 						setNotice({ kind: "error", text: t("error.actionFailed") });
 					}
+				}
+				else if (id === "copy-path") {
+					callFolderRoute(SESSION_PATH_ROUTE, { sessionId: summary.id }).then((data) => {
+						if (typeof data?.path !== "string") throw new Error("path-not-found");
+						return copyText(data.path);
+					}).then(() => {
+						setNotice({ kind: "ok", text: t("notice.pathCopied") });
+						setTimeout(() => setNotice(null), 2000);
+					}).catch((error) => {
+						setNotice({ kind: "error", text: folderErrorText(error.message ?? "path-not-found", t) });
+					});
 				}
 				else if (id === "pin" || id === "unpin") pinSession(summary.id, id === "pin");
 				else if (id === "move-inbox") moveSessionToFolder(summary.id, null);
@@ -1737,18 +1778,7 @@ const RECENT_LIMIT = 5;
 								event.stopPropagation();
 								// Row ids may already carry the "session-" prefix; never double it.
 								const text = "session-" + summary.id.replace(/^session-/, "");
-								try {
-									await navigator.clipboard.writeText(text);
-								} catch {
-									const area = document.createElement("textarea");
-									area.value = text;
-									area.style.position = "fixed";
-									area.style.opacity = "0";
-									document.body.appendChild(area);
-									area.select();
-									document.execCommand("copy");
-									document.body.removeChild(area);
-								}
+								await copyText(text);
 								setCopiedSessionId(summary.id);
 								if (copiedTimerRef.current !== null) clearTimeout(copiedTimerRef.current);
 								copiedTimerRef.current = setTimeout(() => setCopiedSessionId(null), 1500);
@@ -2261,7 +2291,7 @@ const RECENT_LIMIT = 5;
 			);
 			//#endregion
 			//#region list
-			const noticeBar = (notice !== null || foldersError !== null) && e("div", { className: "dsh-ff__notice dsh-ff__notice--error", role: "alert" },
+			const noticeBar = (notice !== null || foldersError !== null) && e("div", { className: "dsh-ff__notice " + (notice !== null && notice.kind === "ok" ? "dsh-ff__notice--ok" : "dsh-ff__notice--error"), role: "alert" },
 				e("span", { className: "dsh-ff__notice-text" }, notice !== null ? notice.text : t("error.folderLoadFailed")),
 				e("button", {
 					type: "button",

@@ -26,7 +26,7 @@ const name = "dsh-session-folders-custom";
 * ctx.logger is a built-in Context property and must never be injected;
 * only these three real services are needed.
 */
-const inject = ["webServer", "storageDomain", "workspaceRegistry", "sessions", "sessionTitle", "llm"];
+const inject = ["webServer", "storageDomain", "workspaceRegistry", "sessions", "sessionTitle", "llm", "sessionPersistence"];
 
 
 
@@ -440,6 +440,24 @@ function apply(ctx) {
 			} finally {
 				autoRenameInFlight.delete(sessionId);
 			}
+		});
+
+		route("session-path", async (body, res) => {
+			const sessionId = body?.sessionId;
+			if (typeof sessionId !== "string" || !SESSION_ID_RE.test(sessionId)) {
+				return respond(res, 400, { error: "bad-request" });
+			}
+			// Live session: header is already in memory.
+			const live = ctx.sessions?.get(sessionId) ?? null;
+			const header = live !== null ? live.header : (await ctx.sessionPersistence.list()).find((h) => h.id === sessionId);
+			if (header === undefined) {
+				return respond(res, 404, { error: "session-not-found" });
+			}
+			const location = ctx.sessionPersistence.locate?.(header);
+			if (location === undefined) {
+				return respond(res, 404, { error: "path-not-found" });
+			}
+			respond(res, 200, { path: location.path });
 		});
 
 		route("unarchive", async (body, res) => {
